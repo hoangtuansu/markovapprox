@@ -5,9 +5,9 @@ import markovapproxbase as mab
 import logging
 import json
 
-class DCSM(mab.MarkovApproxBase):
+class MAVP(mab.MarkovApproxBase):
 
-    def __init__(self, nbr_sw, nbr_controller, E, c_cap, cc, sd, f, log_level=logging.INFO):
+    def __init__(self, nbr_nw, nbr_gw, nbr_vnf, nbr_sc, n_cap, nnl_cap, v_prop, sd, f, log_level=logging.INFO):
         """
         :param M: number of switches
         :param N: number of controllers
@@ -17,12 +17,15 @@ class DCSM(mab.MarkovApproxBase):
         :param sd: an M-element array of demands of each switch
         :param f: an MxM matrix, relationship between switches, representing the flow of traffic going through switches
         """
-        super(DCSM, self).__init__(log_level)
-        self.nbr_switches = nbr_sw
-        self.nbr_controllers = nbr_controller
-        self.controllers_energy = E
-        self.controllers_cap = c_cap
-        self.cc_cost = cc
+        super(MAVP, self).__init__(log_level)
+        self.nbr_network = nbr_nw
+        self.nbr_gateway = nbr_gw
+        self.nbr_vnf = nbr_vnf
+        self.nbr_sc = nbr_sc
+        self.network_capacity = n_cap
+        self.nn_link_capacity = nnl_cap
+        #self.nn_link_delay = nnl_delay
+        self.vnf_prop = v_prop #sensor rate, out bandwidth, sensor bandwidth, nbr_replica
         self.sw_demand = sd
         self.switches_flow = f
 
@@ -160,6 +163,6 @@ if __name__ == '__main__':
     sd = np.array([13, 12, 10, 15, 20])
     """
 
-    dcsm = DCSM(nbr_sw, nbr_controller, E, c_cap, cc, sd, f, logging.DEBUG)
+    dcsm = MAVP(nbr_sw, nbr_controller, E, c_cap, cc, sd, f, logging.DEBUG)
     dcsm.execute()
     dcsm.plot_convergence()
