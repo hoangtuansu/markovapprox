@@ -1,13 +1,13 @@
 import numpy as np
 import numpy.random as npr
 import matplotlib.pyplot as plt
-import markovapproxbase as mab
+import madistributed
 import logging
 import json
 
 class MAVP(mab.MarkovApproxBase):
 
-    def __init__(self, nbr_nw, nbr_gw, nbr_vnf, nbr_sc, n_cap, nnl_cap, v_prop, sd, f, log_level=logging.INFO):
+    def __init__(self, nbr_clouds, nbr_gw, nbr_vnf, nbr_sc, n_cap, nnl_cap, v_prop, sd, f, log_level=logging.INFO):
         """
         :param M: number of switches
         :param N: number of controllers
@@ -18,13 +18,27 @@ class MAVP(mab.MarkovApproxBase):
         :param f: an MxM matrix, relationship between switches, representing the flow of traffic going through switches
         """
         super(MAVP, self).__init__(log_level)
-        self.nbr_network = nbr_nw
-        self.nbr_gateway = nbr_gw
-        self.nbr_vnf = nbr_vnf
-        self.nbr_sc = nbr_sc
+        self.nbr_clouds = 2
+        self.nbr_gateways = 3
+        self.nbr_vnf = 4
+        self.nbr_vnf_instances = [1, 1, 1, 1]
+        self.nbr_sc = 2
+        self.sc_rates = [0.1 0.1]
+        self.bw_sensing_vnf = [3 2 4 1]
+        self.bw_output_vnf = [2 3 1 2]
+        self.tho_vnf = np.array([1 1 1 1])
+        self.set_v_g = np.array([[0], [1,2], [3]])
+        self.beta_1 = np.array([[0 1 0 0],
+                                [0 0 1 0],
+                                [0 0 0 0],
+                                [0 0 0 0]])
+        self.beta_2 = np.array([[0 1 0 0],
+                                [0 0 0 1],
+                                [0 0 0 0],
+                                [0 0 0 0]])
+
         self.network_capacity = n_cap
         self.nn_link_capacity = nnl_cap
-        #self.nn_link_delay = nnl_delay
         self.vnf_prop = v_prop #sensor rate, out bandwidth, sensor bandwidth, nbr_replica
         self.sw_demand = sd
         self.switches_flow = f
@@ -36,6 +50,13 @@ class MAVP(mab.MarkovApproxBase):
 
         # shared_info stores id of switch that change connection between 2 controllers
         self.shared_info = {'cost_diff': 0, 'state': {'selected_sw': 0, 'selected_ctrl': 0, 'last_selected_ctrl': 0}}
+
+
+    def _get_constraint_1(self):
+        bw_g_n = np.zeros(shape=(self.nbr_gateways, self.nbr_clouds))
+        for i in range(self.nbr_gateways):
+            for j in range(self.nbr_clouds):
+                bw_g_n[i,j] = 
 
     def initialize_state(self, support_info=None):
         # state, representing the assignment between a switch and a controller
