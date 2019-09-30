@@ -36,6 +36,7 @@ class MarkovApproxDistributed(ma.MarkovApproxBase):
                 for i in range(self.nbr_states):
                     t = thread.start_new_thread(self.generate_next_states, cur_state)
                     t.join()
+                    
             except expression as identifier:
                 print expression
             next_state = self.pick_next_state()
