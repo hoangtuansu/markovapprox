@@ -7,7 +7,7 @@ import json
 
 class MAVP(mab.MarkovApproxBase):
 
-    def __init__(self, nbr_clouds, nbr_gw, nbr_vnf, nbr_sc, n_cap, nnl_cap, v_prop, sd, f, log_level=logging.INFO):
+    def __init__(self, log_level=logging.INFO):
         """
         :param M: number of switches
         :param N: number of controllers
@@ -18,53 +18,69 @@ class MAVP(mab.MarkovApproxBase):
         :param f: an MxM matrix, relationship between switches, representing the flow of traffic going through switches
         """
         super(MAVP, self).__init__(log_level)
-        self.nbr_clouds = 2
-        self.nbr_gateways = 3
-        self.nbr_vnf = 4
-        self.nbr_vnf_instances = [1, 1, 1, 1]
-        self.nbr_sc = 2
-        self.sc_rates = [0.1 0.1]
-        self.bw_sensing_vnf = [3 2 4 1]
-        self.bw_output_vnf = [2 3 1 2]
-        self.tho_vnf = np.array([1 1 1 1])
-        self.set_v_g = np.array([[0], [1,2], [3]])
-        self.beta_1 = np.array([[0 1 0 0],
+        self._nbr_clouds = 2
+        self._nbr_gateways = 3
+        self._nbr_vnf = 4
+        self._nbr_vnf_instances = [1, 1, 1, 1]
+        self._nbr_sc = 2
+        self._sc_rates = [0.1,0.1]
+        self._bw_sensing_vnf = [3, 2, 4, 1]
+        self._bw_output_vnf = [2, 3, 1, 2]
+        self._tho_vnf = np.array([1, 1, 1, 1])
+        self._set_v_g = np.array([[0], [1, 2], [3]])
+        self._r = np.array([2, 3])
+        self._beta = np.array([[[0 1 0 0],
                                 [0 0 1 0],
                                 [0 0 0 0],
-                                [0 0 0 0]])
-        self.beta_2 = np.array([[0 1 0 0],
+                                [0 0 0 0]],
+                                [[0 1 0 0],
                                 [0 0 0 1],
                                 [0 0 0 0],
-                                [0 0 0 0]])
-        self.x = np.zeros(shape=(self.nbr_clouds, self.nbr_vnf))
-        self.network_capacity = n_cap
-        self.nn_link_capacity = nnl_cap
-        self.vnf_prop = v_prop #sensor rate, out bandwidth, sensor bandwidth, nbr_replica
-        self.sw_demand = sd
-        self.switches_flow = f
+                                [0 0 0 0]]])
+        self._net_cost = np.array([ [0 1 1 1 1],
+                                    [1 0 1 1 1],
+                                    [1 1 0 1 1],
+                                    [1 1 1 0 1],
+                                    [1 1 1 1 0]])
 
-        self.stop_cond = 0
-        self.costs = []
+        self._com_cost = np.array([ [0 1 1 1 1],
+                                    [1 0 1 1 1],
+                                    [1 1 0 1 1],
+                                    [1 1 1 0 1],
+                                    [1 1 1 1 0]])
 
-        self.delta = 0.03
-
-        # shared_info stores id of switch that change connection between 2 controllers
-        self.shared_info = {'cost_diff': 0, 'state': {'selected_sw': 0, 'selected_ctrl': 0, 'last_selected_ctrl': 0}}
-
+        self.x = np.zeros(shape=(self._nbr_clouds, self._nbr_vnf))
 
     def _get_constraint_1(self):
-        bw_g_n = np.zeros(shape=(self.nbr_gateways, self.nbr_clouds))
-        for g in range(self.nbr_gateways):
-            for n in range(self.nbr_clouds):
-                tmp = np.take(self.bw_sensing_vnf, self.set_v_g[g])*self.x[n,self.set_v_g[g]]
+        bw_g_n = np.zeros(shape=(self._nbr_gateways, self._nbr_clouds))
+        for g in range(self._nbr_gateways):
+            for n in range(self._nbr_clouds):
+                tmp = np.take(self._bw_sensing_vnf, self._set_v_g[g])*self.x[n,self._set_v_g[g]]
                 bw_g_n[g,n] = np.sum(tmp)
         return bw_g_n
     
     def _get_constraint_2(self):
-        bw_n_n = np.zeros(shape=(self.nbr_clouds, self.nbr_clouds))
-        for n in range(self.nbr_clouds):
-            for m in range(self.nbr_clouds):
-                tmp = 
+        bw_n_n = np.zeros(shape=(self._nbr_clouds, self._nbr_clouds))
+        for n in range(self._nbr_clouds):
+            for m in range(self._nbr_clouds):
+                for c in range(self._nbr_sc):
+                    for v in range(self._nbr_vnf):
+                        for u in range(self._nbr_vnf):
+                            bw_n_n[n,m] += self._beta[c][v,u]*self._bw_output_vnf[v]*self.x[n,v]*self.x[m,u]
+        return bw_n_n
+    
+    def _get_constraint_3(self):
+        b = np.zeros(shape](1, self._nbr_vnf))
+        r = np.zeros(shape=(1, self._nbr_clouds))
+        for u in range(self._nbr_vnf):
+            for c in range(self._nbr_sc):
+                b += self._beta[c][:,u]*self._bw_output_vnf[:] + self._tho_vnf[:]*self._bw_sensing_vnf[:]
+        
+        for n in range(self._nbr_clouds):
+            r[n] = b*self.x[n,:]*self._r[n]
+        
+        return r
+
 
     def initialize_state(self, support_info=None):
         # state, representing the assignment between a switch and a controller
