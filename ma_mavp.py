@@ -36,7 +36,7 @@ class MAVP(mab.MarkovApproxBase):
                                 [0 0 0 1],
                                 [0 0 0 0],
                                 [0 0 0 0]])
-
+        self.x = np.zeros(shape=(self.nbr_clouds, self.nbr_vnf))
         self.network_capacity = n_cap
         self.nn_link_capacity = nnl_cap
         self.vnf_prop = v_prop #sensor rate, out bandwidth, sensor bandwidth, nbr_replica
@@ -54,9 +54,17 @@ class MAVP(mab.MarkovApproxBase):
 
     def _get_constraint_1(self):
         bw_g_n = np.zeros(shape=(self.nbr_gateways, self.nbr_clouds))
-        for i in range(self.nbr_gateways):
-            for j in range(self.nbr_clouds):
-                bw_g_n[i,j] = 
+        for g in range(self.nbr_gateways):
+            for n in range(self.nbr_clouds):
+                tmp = np.take(self.bw_sensing_vnf, self.set_v_g[g])*self.x[n,self.set_v_g[g]]
+                bw_g_n[g,n] = np.sum(tmp)
+        return bw_g_n
+    
+    def _get_constraint_2(self):
+        bw_n_n = np.zeros(shape=(self.nbr_clouds, self.nbr_clouds))
+        for n in range(self.nbr_clouds):
+            for m in range(self.nbr_clouds):
+                tmp = 
 
     def initialize_state(self, support_info=None):
         # state, representing the assignment between a switch and a controller
