@@ -22,7 +22,11 @@ class MarkovApproxBase(object):
         pass
 
     @abstractmethod
-    def generate_next_state(self, state):
+    def cost_diff(self, state1, state2):
+        return self.state_cost(state1) - self.state_cost(state2)
+
+    @abstractmethod
+    def generate_next_state(self, state, nbr_generated_states=1):
         pass
 
     def transition_rate(self, cur_state, next_state):

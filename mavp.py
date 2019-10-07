@@ -5,7 +5,8 @@ import ma
 import logging
 import json
 import itertools
-
+import pickle
+import threading
 
 class MAVP(ma.MarkovApproxBase):
 
@@ -23,12 +24,12 @@ class MAVP(ma.MarkovApproxBase):
         self._nbr_clouds = 3
         self._nbr_gateways = 5
         self._nbr_vnf = 10
-        self._nbr_vnf_instances = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        self._nbr_vnf_instances = np.ones(self._nbr_vnf)
         self._nbr_sc = 2
         self._sc_rates = [0.1,0.1]
         self._bw_sensing_vnf = npr.uniform(0.1, 0.7, self._nbr_vnf)
         self._bw_output_vnf = npr.uniform(1.5, 2.5, self._nbr_vnf)
-        self._tho_vnf = np.ones(10)
+        self._tho_vnf = np.ones(self._nbr_vnf)
         self._set_v_g = np.array([[0], [1, 2], [3], [4, 5, 6], [7, 8, 9]])
         self._r = npr.randint(2,5, self._nbr_clouds)
         self._beta = np.array([np.zeros((self._nbr_vnf, self._nbr_vnf)), np.zeros((self._nbr_vnf, self._nbr_vnf))])
@@ -41,22 +42,20 @@ class MAVP(ma.MarkovApproxBase):
 
         self._net_cost = np.zeros((self._nbr_clouds + self._nbr_gateways, self._nbr_clouds + self._nbr_gateways))
         for i,j in itertools.combinations(list(range(self._nbr_clouds + self._nbr_gateways)),r=2):
-            if j < self._nbr_clouds:
-                #self._net_cost[i,j] = npr.uniform(4.8, 5.2)
-                self._net_cost[i,j] = self._net_cost[j,i] = 5
-            else:
-                self._net_cost[i,j] = self._net_cost[j,i] = 3
+            self._net_cost[i,j] = npr.uniform(4.8, 5.2)
 
-
-        self._com_cost = np.ones(self._nbr_clouds)
+        self._com_cost = npr.uniform(2.8, 3.2, self._nbr_clouds)
         self.x = np.zeros(shape=(self._nbr_clouds, self._nbr_vnf))
 
         self.costs = []
 
         self.stop_cond = 0
+        self.delta = 0.5
 
     def _get_objetive_cost(self, w):
-        return w*np.sum(self.B_n_n*self._net_cost[0:self._nbr_clouds, 0:self._nbr_clouds]) + (1 - w)*np.sum(self.R_n*self._com_cost)
+        weighted_net_cost = np.sum(np.triu(self.B_n_n)*np.triu(self._net_cost[0:self._nbr_clouds, 0:self._nbr_clouds])) \
+            + np.sum(self.B_g_n*self._net_cost[self._nbr_clouds:, 0:self._nbr_clouds])
+        return w*weighted_net_cost + (1 - w)*np.sum(self.R_n*self._com_cost)
 
     def _get_constraint_1(self):
         self.B_g_n = np.zeros(shape=(self._nbr_gateways, self._nbr_clouds))
@@ -87,19 +86,15 @@ class MAVP(ma.MarkovApproxBase):
         return self.R_n
 
     def initialize_state(self, support_info=None):
-        is_ = np.ones((self._nbr_clouds, self._nbr_vnf))
-        is_[1,:] = np.zeros(self._nbr_vnf)
+        is_ = np.zeros((self._nbr_clouds, self._nbr_vnf))
+        is_[0,:] = np.ones(self._nbr_vnf)
         return is_
 
 
     def generate_next_state(self, cur_state):
         nxt_state = np.copy(cur_state)
-        #backup_x = np.copy(self.x)
         selected_vnf = npr.randint(0, self._nbr_vnf)
         selected_cloud = npr.randint(0, self._nbr_clouds)
-        #selected_vnf = 3
-        #selected_cloud = 1
-        #print("selected vnf:", selected_vnf, "\nselected cloud:", selected_cloud)
         nxt_state[selected_cloud, selected_vnf] = abs(nxt_state[selected_cloud, selected_vnf] - 1) 
         vnf_placement = nxt_state[:, selected_vnf]
         if vnf_placement[vnf_placement == 1].size > self._nbr_vnf_instances[selected_vnf]:
@@ -114,11 +109,6 @@ class MAVP(ma.MarkovApproxBase):
 
     def state_cost(self, state):
         self.x = np.copy(state)
-        """ print "state:\n", self.x
-        print "B_g_n:\n", self._get_constraint_1()
-        print "B_n_n:\n", self._get_constraint_2()
-        print "R_n:\n", self._get_constraint_3()
-        print "cost:\n",  self._get_objetive_cost(0.5) """
 
         self._get_constraint_1()
         self._get_constraint_2()
@@ -127,15 +117,15 @@ class MAVP(ma.MarkovApproxBase):
         return self._get_objetive_cost(0.5)
 
     def transition_rate(self, cur_state, nxt_state):
-        rate = np.exp(0.5*self.delta*(self.state_cost(cur_state) - self.state_cost(nxt_state)))
-        print "[transition_rate] cur_state:\n",  cur_state, self.state_cost(cur_state)
-        print "[transition_rate] nxt_state:\n",  nxt_state, self.state_cost(nxt_state)
-        print "[transition_rate] rate:",  rate
+        rate = np.exp(self.delta*(self.state_cost(cur_state) - self.state_cost(nxt_state)))
+        print("[transition_rate] cur_state:\n",  cur_state, self.state_cost(cur_state))
+        print("[transition_rate] nxt_state:\n",  nxt_state, self.state_cost(nxt_state))
+        print("[transition_rate] rate:",  rate)
         return rate
 
     def stop_condition(self):
         self.stop_cond = self.stop_cond + 1
-        if self.stop_cond <= 10:
+        if self.stop_cond <= 100:
             return True
         return False
 
@@ -147,10 +137,16 @@ class MAVP(ma.MarkovApproxBase):
             next_state = self.generate_next_state(cur_state)
             if (self.transition_condition(cur_state, next_state) is False):
                 continue
-            self.costs.append(self._get_objetive_cost(next_state))
+            self.costs.append(self._get_objetive_cost(0.5))
             cur_state = np.copy(next_state)
 
+    def _save_configuration(self):
+        with open('mavp.dump', 'wb') as config_dictionary_file: 
+            pickle.dump(self, config_dictionary_file)
+
     def plot_convergence(self):
+        threading.Thread(target=self._save_configuration).start()
+
         plt.interactive(False)
         plt.plot(self.costs)
         plt.show()
